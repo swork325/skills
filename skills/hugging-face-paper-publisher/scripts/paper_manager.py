@@ -288,19 +288,40 @@ class PaperManager:
         with open(template_file, 'r', encoding='utf-8') as f:
             template_content = f.read()
 
-        # Replace placeholders
-        content = template_content.replace("{{TITLE}}", title)
-        content = content.replace("{{DATE}}", datetime.now().strftime("%Y-%m-%d"))
+        # Prepare safe values for different contexts
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        safe_title_body = self._sanitize_text(title)
+        authors_val = authors if authors else "Your Name"
+        safe_authors_body = self._sanitize_text(authors_val)
+        abstract_val = abstract if abstract else "Abstract to be written..."
+        safe_abstract_body = self._sanitize_text(abstract_val)
 
-        if authors:
-            content = content.replace("{{AUTHORS}}", authors)
-        else:
-            content = content.replace("{{AUTHORS}}", "Your Name")
+        # Split frontmatter from body for context-aware escaping
+        fm_pattern = r'^(---\s*\n)(.*?\n)(---\s*\n)'
+        fm_match = re.match(fm_pattern, template_content, re.DOTALL)
 
-        if abstract:
-            content = content.replace("{{ABSTRACT}}", abstract)
+        if fm_match:
+            fm_open, fm_body, fm_close = fm_match.group(1), fm_match.group(2), fm_match.group(3)
+            body = template_content[fm_match.end():]
+
+            # YAML-escape values in frontmatter
+            fm_body = fm_body.replace("{{TITLE}}", self._escape_yaml_value(title))
+            fm_body = fm_body.replace("{{AUTHORS}}", self._escape_yaml_value(authors_val))
+            fm_body = fm_body.replace("{{DATE}}", date_str)
+
+            # Sanitize values in body
+            body = body.replace("{{TITLE}}", safe_title_body)
+            body = body.replace("{{AUTHORS}}", safe_authors_body)
+            body = body.replace("{{ABSTRACT}}", safe_abstract_body)
+            body = body.replace("{{DATE}}", date_str)
+
+            content = fm_open + fm_body + fm_close + body
         else:
-            content = content.replace("{{ABSTRACT}}", "Abstract to be written...")
+            # No frontmatter — sanitize everything
+            content = template_content.replace("{{TITLE}}", safe_title_body)
+            content = content.replace("{{DATE}}", date_str)
+            content = content.replace("{{AUTHORS}}", safe_authors_body)
+            content = content.replace("{{ABSTRACT}}", safe_abstract_body)
 
         # Write output
         with open(output, 'w', encoding='utf-8') as f:
@@ -431,6 +452,16 @@ class PaperManager:
             )
 
         return arxiv_id
+
+    @staticmethod
+    def _escape_yaml_value(value: str) -> str:
+        """Escape a string for safe use as a YAML scalar value.
+
+        Wraps in double quotes and escapes internal quotes and backslashes
+        to prevent YAML injection via crafted titles/authors.
+        """
+        value = value.replace('\\', '\\\\').replace('"', '\\"')
+        return f'"{value}"'
 
     @staticmethod
     def _sanitize_text(text: str) -> str:
