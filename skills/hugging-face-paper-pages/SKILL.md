@@ -6,9 +6,10 @@ description: Look up and read Hugging Face paper pages in markdown, and use the 
 # Hugging Face Paper Pages
 
 Hugging Face Paper pages (hf.co/papers) is a platform built on top of arXiv (arxiv.org), specifically for research papers in the field of artificial intelligence (AI) and computer science. Hugging Face users can submit their paper at hf.co/papers/submit, which features it on the Daily Papers feed (hf.co/papers). Each day, users can upvote papers and comment on papers. Each paper page allows authors to:
-- claim their paper (by clicking their name on the `authors` field)
+- claim their paper (by clicking their name on the `authors` field). This makes the paper page appear on their Hugging Face profile.
 - link the associated model checkpoints, datasets and Spaces by including the HF paper or arXiv URL in the model card, dataset card or README of the Space
-- link the Github repository and/or project page URLs.
+- link the Github repository and/or project page URLs
+- link the HF organization. This also makes the paper page appear on the Hugging Face organization page.
 
 Whenever someone mentions a HF paper or arXiv abstract/PDF URL in a model card, dataset card or README of a Space repository, the paper will be automatically indexed. Note that not all papers indexed on Hugging Face are also submitted to daily papers. The latter is more a manner of promoting a research paper. Papers can only be submitted to daily papers up until 14 days after their publication date on arXiv.
 
@@ -71,11 +72,11 @@ curl -s "https://huggingface.co/api/papers/{PAPER_ID}"
 
 This returns structured metadata that can include:
 
-- authors (names and Hugging Face usernames, in case they have claimed the papers)
-- media URLs
+- authors (names and Hugging Face usernames, in case they have claimed the paper)
+- media URLs (uploaded when submitting the paper to Daily Papers)
 - summary (abstract) and AI-generated summary
 - project page and GitHub repository
-- organization and engagement metadata
+- organization and engagement metadata (number of upvotes)
 
 To find models linked to the paper, use:
 
@@ -87,6 +88,12 @@ To find datasets linked to the paper, use:
 
 ```bash
 curl https://huggingface.co/api/datasets?filter=arxiv:{PAPER_ID}
+```
+
+To find spaces linked to the paper, use:
+
+```bash
+curl https://huggingface.co/api/spaces?filter=arxiv:{PAPER_ID}
 ```
 
 #### Claim paper authorship
@@ -211,9 +218,8 @@ curl "https://huggingface.co/api/papers/{PAPER_OBJECT_ID}/links" \
 
 ## Error Handling
 
-- **404 on `https://huggingface.co/papers/{PAPER_ID}`**: the paper is not indexed on Hugging Face paper pages yet.
-- **404 on `.md` endpoint**: the paper page may not be available yet on Hugging Face
-- **404 on `/api/papers/{PAPER_ID}`**: the paper may not be indexed in the API yet
+- **404 on `https://huggingface.co/papers/{PAPER_ID}` or `md` endpoint**: the paper is not indexed on Hugging Face paper pages yet.
+- **404 on `/api/papers/{PAPER_ID}`**: the paper may not be indexed on Hugging Face paper pages yet.
 - **Paper ID not found**: verify the extracted arXiv ID, including any version suffix
 
 ### Fallbacks
