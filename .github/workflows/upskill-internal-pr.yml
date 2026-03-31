@@ -48,7 +48,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.13.5"
 
       - name: Resolve comparison ref
         run: |
@@ -65,7 +65,8 @@ jobs:
           set -euo pipefail
           cmd=(
             uv run
-            --with upskill
+            --python 3.13.5
+            --with git+https://github.com/huggingface/upskill@main
             --with huggingface_hub
             python
             scripts/upskill_ci.py

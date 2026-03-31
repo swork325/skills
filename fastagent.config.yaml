@@ -1,4 +1,4 @@
-default_model: haiku
+default_model: kimi
 
 logger:
   progress_display: false
