@@ -14,6 +14,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 mkdir -p .claude/skills
 cp -r skills/hf-brand .claude/skills/
+cp -r skills/brutalist .claude/skills/
 ```
 
 > [!NOTE]
@@ -78,14 +79,15 @@ Open `http://localhost:7860`. Click around.
 
 ## Try a Different Aesthetic
 
-The starter also includes `skills/brutalist/`. Swap it in:
+The starter also includes `skills/brutalist/`, and you already copied it into `.claude/skills/`. Now ask Claude to use it explicitly:
 
-```bash
-rm -rf .claude/skills/hf-brand
-cp -r skills/brutalist .claude/skills/
+```text
+Restyle `app.py` using the `brutalist` skill specifically. Keep the same
+functionality and examples, but switch the UI and copy to a stark monochrome
+style.
 ```
 
-Then ask Claude to restyle `app.py` again. Same app, different personality:
+Same app, different personality:
 
 ![Brutalist demo](./assets/brutalist.png)
 

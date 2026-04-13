@@ -4,14 +4,9 @@ You built `dataset-publisher` in Unit 1. Now test whether Claude Code actually r
 
 ## Step 1: Install It
 
-Copy your Unit 1 skill into your personal Claude Code skills directory:
+If you completed Unit 1, `dataset-publisher` should already be in `~/.claude/skills/dataset-publisher/`.
 
-```bash
-mkdir -p ~/.claude/skills/dataset-publisher
-cp path/to/your/dataset-publisher/SKILL.md ~/.claude/skills/dataset-publisher/
-```
-
-If you kept helper files from Unit 1, copy those too. They belong in the same folder as `SKILL.md`.
+If you skipped Unit 1, go back to [Hands-on: Write Your First Skill](../unit1/hands-on-write-skill) and install it before continuing.
 
 ## Step 2: Ask Without Naming It
 
@@ -28,8 +23,6 @@ Now ask for something your skill should handle, but do not say the skill name:
 I want to share about 20 Python coding questions and answers with my team
 in a structured way. What's a good approach?
 ```
-
-This exact prompt comes from the Unit 2 draft logs.
 
 ## Step 3: Compare the Before and After
 
@@ -58,7 +51,7 @@ That is the difference you are looking for. The skill changed the route Claude t
 
 ## Step 4: Fix the Trigger
 
-The usual problem is the frontmatter description. Unit 1 used a definition:
+The usual problem is the frontmatter description. Open `~/.claude/skills/dataset-publisher/SKILL.md`. Unit 1 started with a definition:
 
 ```yaml
 description: Create, populate, and publish datasets on the Hugging Face Hub
@@ -74,7 +67,7 @@ description: Create and publish datasets to the Hugging Face Hub. Use when
   for training, create a dataset card, or share Q&A pairs with a team.
 ```
 
-Save the file. Then start a fresh Claude Code session and ask the same prompt again.
+Save the file, then ask the same prompt again. Claude Code re-reads skill descriptions on each turn, so no restart is needed for a file-based skill.
 
 If you installed the skill through a plugin instead of a plain directory copy, use:
 

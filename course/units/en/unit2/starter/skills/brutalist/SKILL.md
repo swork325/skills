@@ -40,9 +40,9 @@ h1 { font-size: 2.5rem; font-weight: 900; text-transform: uppercase; }
 * { border-radius: 0 !important; }
 """
 
-with gr.Blocks(theme=theme, css=css) as demo:
+with gr.Blocks() as demo:
     ...
-demo.launch()
+demo.launch(theme=theme, css=css)
 ```
 
 ## Layout

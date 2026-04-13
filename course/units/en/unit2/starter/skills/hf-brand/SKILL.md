@@ -51,10 +51,10 @@ theme = gr.themes.Soft(
     button_primary_background_fill_hover="#FF9D00",
 )
 
-# Pass theme to Blocks(), not launch():
-with gr.Blocks(theme=theme) as demo:
+# Gradio 6.x prefers app-level presentation settings at launch():
+with gr.Blocks() as demo:
     ...
-demo.launch()
+demo.launch(theme=theme)
 ```
 
 ## Layout

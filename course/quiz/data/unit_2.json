@@ -16,23 +16,39 @@
     "correct_answer": "C"
   },
   {
-    "question": "Why did the original dataset-publisher skill fail to fire on the Q&A-sharing prompt?",
-    "answer_a": "The skill body was too short",
-    "answer_b": "The helper files were missing",
-    "answer_c": "The description defined the skill but did not describe natural trigger situations",
-    "answer_d": "Claude Code only loads plugin skills automatically",
-    "correct_answer": "C"
-  },
-  {
-    "question": "In the minimal starter from Inside the Box, what does load_skills(...) do?",
-    "answer_a": "Calls the language model to rank skills",
-    "answer_b": "Parses SKILL.md files into structured Skill objects",
-    "answer_c": "Uploads skill files to the Hub",
-    "answer_d": "Executes the selected skills immediately",
+    "question": "A skill's body is correct, but it never auto-activates on natural prompts. What is the most likely fix?",
+    "answer_a": "Move it from .claude/skills/ to ~/.claude/skills/",
+    "answer_b": "Rewrite the description to include the language a user would actually type",
+    "answer_c": "Add more headings to SKILL.md",
+    "answer_d": "Convert it to an MCP server",
     "correct_answer": "B"
   },
   {
-    "question": "In that same starter, what is select_skills(...) responsible for?",
+    "question": "Why does an agent read skill descriptions before loading full skill bodies?",
+    "answer_a": "Descriptions are cached and bodies are not",
+    "answer_b": "Selecting on short descriptions is cheap, while injecting full bodies costs context",
+    "answer_c": "Claude Code requires two passes for every skill",
+    "answer_d": "Skill bodies cannot be read at runtime",
+    "correct_answer": "B"
+  },
+  {
+    "question": "What's the difference between a skill and an MCP server?",
+    "answer_a": "Skills run in the browser; MCP servers run locally",
+    "answer_b": "A skill tells Claude how to use tools it has; an MCP server gives Claude a new tool",
+    "answer_c": "Skills are YAML; MCP servers are JSON",
+    "answer_d": "There is no difference",
+    "correct_answer": "B"
+  },
+  {
+    "question": "When would you type /skill-name instead of relying on auto-activation?",
+    "answer_a": "Auto-activation only works for plugin skills",
+    "answer_b": "When you want that specific skill's workflow now, regardless of prompt wording",
+    "answer_c": "Slash invocation is required the first time you use any skill",
+    "answer_d": "Auto-activation is deprecated",
+    "correct_answer": "B"
+  },
+  {
+    "question": "In the agent/ starter from Inside the Box, what is select_skills(...) responsible for?",
     "answer_a": "Building the Gradio UI",
     "answer_b": "Choosing which skill names are relevant to the current user message",
     "answer_c": "Writing new skill files",
@@ -40,35 +56,19 @@
     "correct_answer": "B"
   },
   {
-    "question": "Why is system_prompt_for(...) a separate step from select_skills(...)?",
-    "answer_a": "Selection reads short descriptions, while composition injects the full chosen skill bodies",
-    "answer_b": "Claude Code requires two Python modules for every skill",
-    "answer_c": "The Hub rejects combined prompts",
-    "answer_d": "Skills cannot be loaded and composed in the same turn",
+    "question": "You're writing a style skill for one specific app. Where should it live?",
+    "answer_a": "In the project's .claude/skills/ because it belongs to that codebase",
+    "answer_b": "Installed via /plugin install from a marketplace",
+    "answer_c": "In ~/.claude/skills/ so every project gets it",
+    "answer_d": "Inside SKILL.md in the repo root",
     "correct_answer": "A"
   },
   {
-    "question": "What problem does the no-fluff skill fix in the Space exercise?",
-    "answer_a": "Incorrect Python imports",
-    "answer_b": "Missing authentication for the Hub",
-    "answer_c": "Repeated disclaimer and filler text in demo code and UI",
-    "answer_d": "Broken dataset card generation",
-    "correct_answer": "C"
-  },
-  {
-    "question": "What is the most useful job for skill-creator in this unit?",
-    "answer_a": "Replacing Gradio with Streamlit",
-    "answer_b": "Optimizing a skill description so it triggers on realistic requests",
-    "answer_c": "Creating MCP servers automatically",
-    "answer_d": "Publishing a Space without the Hub CLI",
-    "correct_answer": "B"
-  },
-  {
-    "question": "Which current command creates a Gradio Space repo on the Hub?",
-    "answer_a": "huggingface-cli repo create your-demo --type space --space_sdk gradio",
-    "answer_b": "hf repos create your-demo --repo-type space --space-sdk gradio",
-    "answer_c": "hf spaces create your-demo --sdk gradio",
-    "answer_d": "hf upload your-demo . . --space-sdk gradio",
+    "question": "What is skill-creator most useful for?",
+    "answer_a": "Converting MCP servers into skills",
+    "answer_b": "Running a skill authoring loop: scaffolding or refining a skill and testing how it activates",
+    "answer_c": "Publishing Spaces to the Hub",
+    "answer_d": "Translating skills between agent runtimes",
     "correct_answer": "B"
   },
   {
