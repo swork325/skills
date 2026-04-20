@@ -49,17 +49,6 @@ curl -s -H "Authorization: Bearer $(cat ~/.cache/huggingface/token)" \
 
 Read the returned list and select the datasets most relevant to the user's task — match on dataset id, tags, and description. Use your judgment; don't limit yourself to 2-3. Aim for comprehensive coverage: if 5 benchmarks clearly cover the task, use all 5.
 
-**Curated supplements** — always include these for the given task regardless of what the API returns:
-
-| Task | Always include these benchmark dataset IDs |
-|------|---------------------------------------------|
-| Chat / instruction following | `open-llm-leaderboard/contents` |
-| Coding / software engineering | `EvalPlus/evalplus_leaderboard`, `SWE-bench/SWE-bench_Verified`, `ScaleAI/SWE-bench_Pro`, `harborframework/terminal-bench-2.0` |
-| Math / reasoning | `HuggingFaceH4/aime_2024`, `cais/hle` |
-| Embeddings / RAG / retrieval | `mteb/leaderboard` |
-| Multimodal / vision-language | `opencompass/open_vlm_leaderboard` |
-| Speech / ASR | `hf-audio/open_asr_leaderboard` |
-
 ---
 
 ## Step 3: Fetch top models from leaderboards
