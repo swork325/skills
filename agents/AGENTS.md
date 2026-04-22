@@ -8,6 +8,7 @@ These skills are:
  - huggingface-datasets -> "skills/huggingface-datasets/SKILL.md"
  - huggingface-gradio -> "skills/huggingface-gradio/SKILL.md"
  - huggingface-llm-trainer -> "skills/huggingface-llm-trainer/SKILL.md"
+ - huggingface-local-models -> "skills/huggingface-local-models/SKILL.md"
  - huggingface-paper-publisher -> "skills/huggingface-paper-publisher/SKILL.md"
  - huggingface-papers -> "skills/huggingface-papers/SKILL.md"
  - huggingface-tool-builder -> "skills/huggingface-tool-builder/SKILL.md"
@@ -24,6 +25,7 @@ huggingface-community-evals: `Run evaluations for Hugging Face Hub models using 
 huggingface-datasets: `Use this skill for Hugging Face Dataset Viewer API workflows that fetch subset/split metadata, paginate rows, search text, apply filters, download parquet URLs, and read size or statistics.`
 huggingface-gradio: `Build Gradio web UIs and demos in Python. Use when creating or editing Gradio apps, components, event listeners, layouts, or chatbots.`
 huggingface-llm-trainer: `Train or fine-tune language and vision models using TRL (Transformer Reinforcement Learning) or Unsloth with Hugging Face Jobs infrastructure. Covers SFT, DPO, GRPO and reward modeling training methods, plus GGUF conversion for local deployment. Includes guidance on the TRL Jobs package, UV scripts with PEP 723 format, dataset preparation and validation, hardware selection, cost estimation, Trackio monitoring, Hub authentication, model selection/leaderboards and model persistence. Use for tasks involving cloud GPU training, GGUF conversion, or when users mention training on Hugging Face Jobs without local GPU setup.`
+huggingface-local-models: `"Use to select models to run locally with llama.cpp and GGUF on CPU, Mac Metal, CUDA, or ROCm. Covers finding GGUFs, quant selection, running servers, exact GGUF file lookup, conversion, and OpenAI-compatible local serving."`
 huggingface-paper-publisher: `Publish and manage research papers on Hugging Face Hub. Supports creating paper pages, linking papers to models/datasets, claiming authorship, and generating professional markdown-based research articles.`
 huggingface-papers: `Look up and read Hugging Face paper pages in markdown, and use the papers API for structured metadata such as authors, linked models/datasets/spaces, Github repo and project page. Use when the user shares a Hugging Face paper page URL, an arXiv URL or ID, or asks to summarize, explain, or analyze an AI research paper.`
 huggingface-tool-builder: `Use this skill when the user wants to build tool/scripts or achieve a task where using data from the Hugging Face API would help. This is especially useful when chaining or combining API calls or the task will be repeated/automated. This Skill creates a reusable script to fetch, enrich or process data.`
