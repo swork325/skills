@@ -66,13 +66,7 @@ Collect model IDs and scores across all benchmarks. If a leaderboard returns an 
 
 ## Step 4: Enrich with model metadata
 
-For the top 10-15 candidate model IDs, use the `hub_repo_details` MCP tool:
-
-```
-hub_repo_details(repo_ids=["org/model1", "org/model2", ...], repo_type="model")
-```
-
-If the MCP tool is unavailable, use the REST API or CLI equivalents:
+For the top 10-15 candidate model IDs, get model infos.
 
 ```bash
 # REST API
@@ -80,7 +74,7 @@ curl -s -H "Authorization: Bearer $(cat ~/.cache/huggingface/token)" \
   "https://huggingface.co/api/models/org/model1" | jq '{safetensors, tags, cardData}'
 
 # CLI (hf-cli)
-hf repo info org/model1 --repo-type model
+hf models info org/model1 --json | jq '{safetensors, tags, cardData}'
 ```
 
 Extract from each response:
