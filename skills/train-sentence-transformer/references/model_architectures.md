@@ -77,7 +77,7 @@ Skipping `transformer_task="text-generation"` or `pooling_mode="lasttoken"` on a
 
 For training decoder bases:
 - Learning rate: typically `1e-4` or higher (not `2e-5` like encoders).
-- LoRA is almost always the right choice for >1B-param bases; see `../scripts/train_with_lora_example.py` (its docstring covers when to use, hyperparams, QLoRA for 7B+, and adapter sharing).
+- LoRA is almost always the right choice for >1B-param bases; see `../scripts/train_sentence_transformer_with_lora_example.py` (its docstring covers when to use, hyperparams, QLoRA for 7B+, and adapter sharing).
 
 ## Static embeddings
 
@@ -116,7 +116,7 @@ static_embedding = StaticEmbedding.from_model2vec("minishlab/potion-base-8M")
 static_embedding = StaticEmbedding.from_distillation("sentence-transformers/all-MiniLM-L6-v2", vocabulary=list(tokenizer.get_vocab().keys()))
 ```
 
-See `scripts/train_static_embedding_example.py` for a runnable end-to-end recipe (random init + MNRL + Matryoshka + bf16 + lr=2e-1) and the [Static Embeddings blog post](https://huggingface.co/blog/static-embeddings) for benchmarks.
+See `../scripts/train_sentence_transformer_static_embedding_example.py` for a runnable end-to-end recipe (random init + MNRL + Matryoshka + bf16 + lr=2e-1) and the [Static Embeddings blog post](https://huggingface.co/blog/static-embeddings) for benchmarks.
 
 ## Multimodal via VLM backbone
 
@@ -127,7 +127,7 @@ from sentence_transformers import SentenceTransformer
 
 model = SentenceTransformer(
     "Qwen/Qwen3-VL-Embedding-2B",
-    model_kwargs={"torch_dtype": "bfloat16", "attn_implementation": "flash_attention_2"},
+    model_kwargs={"attn_implementation": "flash_attention_2"},  # do NOT set torch_dtype here; see training_args.md
     processor_kwargs={"min_pixels": 28 * 28, "max_pixels": 600 * 600},
 )
 
@@ -139,6 +139,8 @@ print(model.modalities)
 Training data can mix text, PIL images, image paths/URLs, audio, and mixed-modality dicts like `{"image": <PIL>, "text": "describe this"}`. The data collator handles preprocessing via the model's `preprocess` method.
 
 Install multimodal extras: `pip install "sentence-transformers[image]"` (or `[audio]`, `[video]`).
+
+**Precision**: load in fp32 and pass `bf16=True` (or `fp16=True`) to TrainingArguments — autocast handles the inference path. Don't set `torch_dtype="bfloat16"` in `model_kwargs`: it puts Adam state in bf16 and silently degrades quality (see `training_args.md`).
 
 ## Multimodal via Router
 
@@ -173,4 +175,4 @@ model = SentenceTransformer(modules=[router])
 - **Decoder base with mean pooling**: silently produces garbage embeddings. Always use `lasttoken`.
 - **Router multimodal without training**: the separate encoders' embedding spaces are unaligned at init. Don't expect useful cross-modal similarity until you've trained with a loss that aligns the spaces.
 - **StaticEmbedding with fewer than 100k pairs**: the model won't learn enough. Either warm-start via `from_model2vec` / `from_distillation`, or use a regular encoder.
-- **Large VLM backbones on consumer GPUs**: consider `torch_dtype="bfloat16"` + `attn_implementation="flash_attention_2"` + LoRA.
+- **Large VLM backbones on consumer GPUs**: combine LoRA + `attn_implementation="flash_attention_2"`. With LoRA only, you can additionally pass `torch_dtype="bfloat16"` — the bf16 base weights are frozen, so the Adam-state precision concern from the precision rule above doesn't apply (the LoRA adapter stays fp32, so its optimizer state stays fp32). Without LoRA, follow the precision rule: keep weights fp32 and rely on `bf16=True` autocast.

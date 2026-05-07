@@ -32,7 +32,7 @@ Picks:
 - Student: must be multilingual (xlm-roberta-base, paraphrase-multilingual-MiniLM-L12-v2,
   microsoft/mdeberta-v3-base).
 - Student dim must match teacher dim, otherwise add a PCA-init Dense projection
-  (see train_distillation_example.py).
+  (see train_sentence_transformer_distillation_example.py).
 """
 
 from __future__ import annotations
@@ -58,6 +58,7 @@ from sentence_transformers.sentence_transformer.evaluation import (
     TranslationEvaluator,
 )
 from sentence_transformers.sentence_transformer.losses import MSELoss
+from sentence_transformers.sentence_transformer.modules import Normalize
 
 
 def autocast_ctx():
@@ -98,6 +99,7 @@ RUN_NAME = "xlm-roberta-multilingual-from-mpnet"
 
 TEACHER_ENCODE_BATCH_SIZE = 256
 TRAIN_BATCH_SIZE = 64
+SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 
 def setup_logging():
@@ -144,10 +146,12 @@ def load_parallel_data() -> tuple[DatasetDict, DatasetDict]:
 
 
 def build_evaluator(eval_dict: DatasetDict, teacher: SentenceTransformer) -> SequentialEvaluator:
-    """Per-language MSE + TranslationEvaluator (the real success signal)."""
-    evaluators = []
+    """Per-language MSE + TranslationEvaluator. `main_score_function` averages
+    translation accuracies only; MSE (`negative_mse * 100`) is on a different
+    scale and would break the verdict threshold if mixed in."""
+    sub_evaluators = []
     for subset, ds in eval_dict.items():
-        evaluators.append(
+        sub_evaluators.append(
             MSEEvaluator(
                 source_sentences=ds["english"],
                 target_sentences=ds["non_english"],
@@ -156,7 +160,7 @@ def build_evaluator(eval_dict: DatasetDict, teacher: SentenceTransformer) -> Seq
                 batch_size=TEACHER_ENCODE_BATCH_SIZE,
             )
         )
-        evaluators.append(
+        sub_evaluators.append(
             TranslationEvaluator(
                 source_sentences=ds["english"],
                 target_sentences=ds["non_english"],
@@ -164,7 +168,8 @@ def build_evaluator(eval_dict: DatasetDict, teacher: SentenceTransformer) -> Seq
                 batch_size=TEACHER_ENCODE_BATCH_SIZE,
             )
         )
-    return SequentialEvaluator(evaluators, main_score_function=lambda scores: float(np.mean(scores)))
+    # Sub-evaluators alternate MSE / Translation per language; scores[1::2] are the translation accuracies.
+    return SequentialEvaluator(sub_evaluators, main_score_function=lambda scores: float(np.mean(scores[1::2])))
 
 
 def main() -> None:
@@ -199,17 +204,25 @@ def main() -> None:
         ),
     )
     student.max_seq_length = STUDENT_MAX_SEQ_LENGTH
+    # Match the teacher's final Normalize. MSELoss against unit-norm targets fights student
+    # outputs at norm ~5-10 and can silently regress
+    if any(isinstance(m, Normalize) for m in teacher) and not any(isinstance(m, Normalize) for m in student):
+        student.append(Normalize())
 
     if student.get_embedding_dimension() != teacher.get_embedding_dimension():
         raise SystemExit(
             f"Student dim ({student.get_embedding_dimension()}) != teacher dim "
             f"({teacher.get_embedding_dimension()}). MSELoss requires matching dims. "
             "Either pick a student with matching dim, or add a Dense projection layer "
-            "(see train_distillation_example.py 'MISMATCHED EMBEDDING DIMS')."
+            "(see train_sentence_transformer_distillation_example.py 'MISMATCHED EMBEDDING DIMS')."
         )
 
     logging.info("Loading parallel data")
     train_dict, eval_dict = load_parallel_data()
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: trimming each language subset; will run max_steps=1 and skip Hub push")
+        train_dict = DatasetDict({k: v.select(range(min(50, len(v)))) for k, v in train_dict.items()})
+        eval_dict = DatasetDict({k: v.select(range(min(20, len(v)))) for k, v in eval_dict.items()})
 
     def attach_teacher_label(batch):
         return {
@@ -228,11 +241,12 @@ def main() -> None:
     evaluator = build_evaluator(eval_dict, teacher)
     logging.info("Student baseline (before training):")
     with autocast_ctx():
-        baseline_eval = evaluator(student)[evaluator.primary_metric]
+        baseline_eval = evaluator(student)["sequential_score"]
 
     args = SentenceTransformerTrainingArguments(
         output_dir=OUTPUT_DIR,
         num_train_epochs=3,
+        max_steps=1 if SMOKE_TEST else -1,
         per_device_train_batch_size=TRAIN_BATCH_SIZE,
         per_device_eval_batch_size=TRAIN_BATCH_SIZE,
         learning_rate=2e-5,
@@ -247,9 +261,9 @@ def main() -> None:
         logging_steps=0.01,
         logging_first_step=True,
         load_best_model_at_end=True,
-        metric_for_best_model=f"eval_{list(eval_dict.keys())[0]}_negative_mse",
+        metric_for_best_model="eval_sequential_score",
         greater_is_better=True,
-        report_to="trackio",
+        report_to="none" if SMOKE_TEST else "trackio",
         run_name=RUN_NAME,
         seed=12,
     )
@@ -262,12 +276,13 @@ def main() -> None:
         loss=loss,
         evaluator=evaluator,
     )
-    log_trackio_dashboard()
+    if not SMOKE_TEST:
+        log_trackio_dashboard()
     trainer.train()
 
     logging.info("Final student evaluation:")
     with autocast_ctx():
-        score = evaluator(student)[evaluator.primary_metric]
+        score = evaluator(student)["sequential_score"]
     delta = score - baseline_eval
     verdict = "WIN" if delta >= 0.005 else "MARGINAL" if delta >= 0 else "REGRESSION"
     logging.info(f"VERDICT: {verdict} | score={score:.4f} | baseline={baseline_eval:.4f} | delta={delta:+.4f}")
@@ -276,9 +291,13 @@ def main() -> None:
     student.save_pretrained(final_dir)
     logging.info(f"Saved to {final_dir}")
 
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: skipping Hub push")
+        return
+
     try:
-        student.push_to_hub(RUN_NAME)
-        logging.info(f"Pushed to https://huggingface.co/{RUN_NAME}")
+        commit_url = student.push_to_hub(RUN_NAME)
+        logging.info(f"Pushed model to {commit_url.rsplit('/commit/', 1)[0]}")
     except Exception:
         import traceback
 

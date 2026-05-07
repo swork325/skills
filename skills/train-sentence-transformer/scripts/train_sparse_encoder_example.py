@@ -21,10 +21,10 @@ checkpoint works (DistilBERT, BERT, MiniLM MLM variants, existing SPLADE models)
 
 Run locally:
     pip install "sentence-transformers[train]>=5.0"
-    python train_example.py
+    python train_sparse_encoder_example.py
 
 Multi-GPU:
-    accelerate launch train_example.py
+    accelerate launch train_sparse_encoder_example.py
 
 Hugging Face Jobs: paste this file's contents as the `script` in hf_jobs(...).
 """
@@ -84,6 +84,7 @@ RUN_NAME = "distilbert-splade-gooaq"
 
 QUERY_REGULARIZER_WEIGHT = 5e-5
 DOCUMENT_REGULARIZER_WEIGHT = 3e-5
+SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 
 def setup_logging():
@@ -136,9 +137,13 @@ def main() -> None:
     )
 
     logging.info(f"Loading dataset: {DATASET_NAME}")
+    train_size = 50 if SMOKE_TEST else TRAIN_SIZE
+    eval_size = 20 if SMOKE_TEST else EVAL_SIZE
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: trimmed dataset; will run max_steps=1 and skip Hub push")
     full = load_dataset(DATASET_NAME, split="train")
-    split = full.train_test_split(test_size=EVAL_SIZE, seed=12)
-    train_dataset = split["train"].select(range(min(TRAIN_SIZE, len(split["train"]))))
+    split = full.train_test_split(test_size=eval_size, seed=12)
+    train_dataset = split["train"].select(range(min(train_size, len(split["train"]))))
     eval_dataset = split["test"]
     logging.info(f"  train: {len(train_dataset):,} rows | eval: {len(eval_dataset):,} rows")
     logging.info(f"  columns: {train_dataset.column_names}")
@@ -153,12 +158,15 @@ def main() -> None:
     evaluator = SparseNanoBEIREvaluator(dataset_names=["msmarco", "nfcorpus", "nq"])
     logging.info("Baseline evaluation:")
     with autocast_ctx():
+        # Must run before deriving metric_key: evaluator(model) mutates primary_metric to add the name_ prefix.
         baseline_result = evaluator(model)
         baseline_eval = baseline_result[evaluator.primary_metric]
+    metric_key = f"eval_{evaluator.primary_metric}"
 
     args = SparseEncoderTrainingArguments(
         output_dir=OUTPUT_DIR,
         num_train_epochs=1,
+        max_steps=1 if SMOKE_TEST else -1,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
         learning_rate=2e-5,
@@ -175,9 +183,9 @@ def main() -> None:
         logging_steps=0.01,
         logging_first_step=True,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_NanoBEIR_mean_dot_ndcg@10",
+        metric_for_best_model=metric_key,
         greater_is_better=True,
-        report_to="trackio",  # Optional
+        report_to="none" if SMOKE_TEST else "trackio",
         run_name=RUN_NAME,
         seed=12,
     )
@@ -190,7 +198,8 @@ def main() -> None:
         loss=loss,
         evaluator=evaluator,
     )
-    log_trackio_dashboard()
+    if not SMOKE_TEST:
+        log_trackio_dashboard()
     trainer.train()
 
     logging.info("Post-training evaluation:")
@@ -199,18 +208,25 @@ def main() -> None:
         score = result[evaluator.primary_metric]
     delta = score - baseline_eval
     verdict = "WIN" if delta >= 0.005 else "MARGINAL" if delta >= 0 else "REGRESSION"
+    # Active-dim keys come back name-prefixed (e.g. "NanoBEIR_..._query_active_dims"); suffix-match for compat.
+    qad = next((v for k, v in result.items() if k.endswith("query_active_dims")), "n/a")
+    cad = next((v for k, v in result.items() if k.endswith("corpus_active_dims")), "n/a")
     logging.info(
         f"VERDICT: {verdict} | score={score:.4f} | baseline={baseline_eval:.4f} | delta={delta:+.4f} "
-        f"| query_active={result.get('query_active_dims', 'n/a')} doc_active={result.get('document_active_dims', 'n/a')}"
+        f"| query_active={qad} corpus_active={cad}"
     )
 
     final_dir = f"{OUTPUT_DIR}/final"
     model.save_pretrained(final_dir)
     logging.info(f"Saved final model to {final_dir}")
 
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: skipping Hub push")
+        return
+
     try:
-        model.push_to_hub(RUN_NAME)
-        logging.info(f"Pushed model to https://huggingface.co/{RUN_NAME}")
+        commit_url = model.push_to_hub(RUN_NAME)
+        logging.info(f"Pushed model to {commit_url.rsplit('/commit/', 1)[0]}")
     except Exception:
         import traceback
 

@@ -24,7 +24,8 @@ CRITICAL: `activation_fn=nn.Identity()` is mandatory for LambdaLoss / ListNet /
 ListMLE / PListMLE / RankNet / MarginMSE / MSE — anything that's not
 `BinaryCrossEntropyLoss` or `CrossEntropyLoss`. The default `Sigmoid` (with
 `num_labels=1`) saturates raw logits >5 to ~1.0 inside `predict()`, silently
-collapsing eval ranking. See SKILL.md Directive 6.
+collapsing eval ranking. See `../references/troubleshooting.md` ("CrossEncoder
+eval nDCG crashes after distillation / listwise / pairwise training").
 
 OOM recovery for LambdaLoss: drop `mini_batch_size` first (chunking inside the
 loss preserves the K-list semantic), then `per_device_train_batch_size` paired
@@ -33,10 +34,10 @@ length) only as a last resort. Lowering K changes the experiment.
 
 Run locally:
     pip install "sentence-transformers[train]>=5.0"
-    python train_listwise_example.py
+    python train_cross_encoder_listwise_example.py
 
 Multi-GPU:
-    accelerate launch train_listwise_example.py
+    accelerate launch train_cross_encoder_listwise_example.py
 
 Hugging Face Jobs: paste this file's contents as the `script` in hf_jobs(...).
 """
@@ -102,6 +103,7 @@ OUTPUT_DIR = "models/modernbert-gooaq-lambda"
 RUN_NAME = "modernbert-gooaq-lambda"
 HARD_NEG_CACHE = f"data/{RUN_NAME}-hard-negatives"
 HARD_EVAL_CACHE = f"data/{RUN_NAME}-hard-eval"
+SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 
 def setup_logging():
@@ -148,6 +150,9 @@ def main() -> None:
             model_name=f"{MODEL_NAME.split('/')[-1]} reranker trained with LambdaLoss on GooAQ",
         ),
     )
+    # ModernBERT defaults to max_seq_length=8192, which allocates activation memory
+    # for 8192-token sequences regardless of input length. Pin to a (q, doc) cap.
+    model.max_seq_length = 512
 
     full_dataset = load_dataset(DATASET_NAME, split="train").select(range(TRAIN_SIZE))
     split = full_dataset.train_test_split(test_size=EVAL_SIZE, seed=12)
@@ -176,7 +181,6 @@ def main() -> None:
             retriever,
             corpus=full_dataset["answer"],
             num_negatives=EVAL_RERANK_DEPTH,
-            include_positives=True,  # gold positive lives in the candidate list
             output_format="n-tuple",
             use_faiss=True,
             batch_size=4096,
@@ -185,23 +189,27 @@ def main() -> None:
         hard_eval.save_to_disk(HARD_EVAL_CACHE)
         del retriever
         torch.cuda.empty_cache()
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: trimmed mined datasets; will run max_steps=1 and skip Hub push")
+        hard_train = hard_train.select(range(min(50, len(hard_train))))
+        hard_eval = hard_eval.select(range(min(20, len(hard_eval))))
     logging.info(f"  train: {len(hard_train):,} rows | columns: {hard_train.column_names}")
 
     loss = LambdaLoss(model=model, mini_batch_size=16)  # mini_batch_size: drop first if OOM
 
     nano_beir = CrossEncoderNanoBEIREvaluator(dataset_names=["msmarco", "nfcorpus", "nq"])
+    # Pure reranker quality: positive is in `documents` and `always_rerank_positives=True` (default).
     in_domain = CrossEncoderRerankingEvaluator(
         samples=[
             {
                 "query": row["question"],
                 "positive": [row["answer"]],
-                "documents": [row[col] for col in hard_eval.column_names[2:]],
+                "documents": [row["answer"]] + [row[col] for col in hard_eval.column_names[2:]],
             }
             for row in hard_eval
         ],
         batch_size=64,
         name="gooaq-dev",
-        always_rerank_positives=False,  # End-to-end retriever+reranker quality
     )
     evaluator = SequentialEvaluator([in_domain, nano_beir])
     logging.info("Baseline evaluation:")
@@ -211,6 +219,7 @@ def main() -> None:
     args = CrossEncoderTrainingArguments(
         output_dir=OUTPUT_DIR,
         num_train_epochs=1,
+        max_steps=1 if SMOKE_TEST else -1,
         per_device_train_batch_size=64,
         per_device_eval_batch_size=64,
         learning_rate=2e-5,
@@ -228,7 +237,7 @@ def main() -> None:
         load_best_model_at_end=True,
         metric_for_best_model=f"eval_{in_domain.primary_metric}",  # in-domain reranker > NanoBEIR
         greater_is_better=True,
-        report_to="trackio",
+        report_to="none" if SMOKE_TEST else "trackio",
         run_name=RUN_NAME,
         seed=12,
     )
@@ -241,7 +250,8 @@ def main() -> None:
         evaluator=evaluator,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
-    log_trackio_dashboard()
+    if not SMOKE_TEST:
+        log_trackio_dashboard()
     trainer.train()
 
     logging.info("Post-training evaluation:")
@@ -255,9 +265,13 @@ def main() -> None:
     model.save_pretrained(final_dir)
     logging.info(f"Saved final model to {final_dir}")
 
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: skipping Hub push")
+        return
+
     try:
-        model.push_to_hub(RUN_NAME)
-        logging.info(f"Pushed model to https://huggingface.co/{RUN_NAME}")
+        commit_url = model.push_to_hub(RUN_NAME)
+        logging.info(f"Pushed model to {commit_url.rsplit('/commit/', 1)[0]}")
     except Exception:
         import traceback
 

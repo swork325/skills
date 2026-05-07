@@ -8,41 +8,18 @@
 #     "trackio",
 # ]
 # ///
-"""Production-ready bi-encoder (SentenceTransformer) training template.
+"""Matryoshka (MRL) training: train once, deploy at multiple embedding dimensions.
 
-This script demonstrates a recommended setup:
-- MultipleNegativesRankingLoss on (anchor, positive, negative) triplets
-- NanoBEIREvaluator for retrieval metrics during training
-- BatchSamplers.NO_DUPLICATES (critical for MNRL)
-- load_best_model_at_end with a retrieval metric
-- Auto model card + optional Hub push
+MatryoshkaLoss wraps a base loss and optimizes it at several truncated dimensions
+simultaneously. At inference, load with `truncate_dim=<target>` to get that size
+with ~95% of full-dim quality.
 
-Runs identically in two modes:
+Typical use: train at [768, 512, 256, 128, 64], deploy at 128 for 6x smaller
+index + 6x faster ANN with minimal quality loss.
 
-    # Local
+Run locally:
     pip install "sentence-transformers[train]>=5.0"
-    python train_example.py
-
-    # Or with uv (no explicit install needed)
-    uv run train_example.py
-
-    # Multi-GPU
-    accelerate launch train_example.py
-
-    # Hugging Face Jobs (paste the entire file contents as `script`)
-    hf_jobs("uv", {
-        "script": "<contents of this file>",
-        "flavor": "a10g-large",
-        "timeout": "3h",
-        "secrets": {"HF_TOKEN": "$HF_TOKEN"},
-    })
-
-Adjust MODEL_NAME, DATASET_NAME, OUTPUT_DIR, RUN_NAME at the top of the script.
-Default Hub push: at end of run, public, under your authenticated user as
-`{user}/{RUN_NAME}`, wrapped in try/except. To skip the push, comment out the
-push_to_hub call. For HF Jobs (ephemeral env), also enable in-trainer push:
-add `push_to_hub=True`, `hub_model_id=RUN_NAME`, `hub_strategy="every_save"`
-to TrainingArguments.
+    python train_sentence_transformer_matryoshka_example.py
 """
 
 from __future__ import annotations
@@ -57,13 +34,17 @@ from datasets import load_dataset
 
 from sentence_transformers import (
     SentenceTransformer,
-    SentenceTransformerModelCardData,
     SentenceTransformerTrainer,
     SentenceTransformerTrainingArguments,
 )
 from sentence_transformers.base.sampler import BatchSamplers
-from sentence_transformers.sentence_transformer.evaluation import NanoBEIREvaluator
-from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.evaluation import (
+    EmbeddingSimilarityEvaluator,
+    NanoBEIREvaluator,
+    SequentialEvaluator,
+)
+from sentence_transformers.sentence_transformer.losses import MatryoshkaLoss, MultipleNegativesRankingLoss
+from sentence_transformers.util.similarity import SimilarityFunction
 
 
 def autocast_ctx():
@@ -89,12 +70,10 @@ def log_trackio_dashboard():
 
 
 MODEL_NAME = "microsoft/mpnet-base"
-DATASET_NAME = "sentence-transformers/all-nli"
-DATASET_SUBSET = "triplet"
-TRAIN_SIZE = 50_000
-EVAL_SIZE = 1_000
-OUTPUT_DIR = "models/mpnet-base-all-nli"
-RUN_NAME = "mpnet-base-all-nli"
+MATRYOSHKA_DIMS = [768, 512, 256, 128, 64]
+OUTPUT_DIR = "models/mpnet-matryoshka"
+RUN_NAME = "mpnet-matryoshka"
+SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 
 def setup_logging():
@@ -130,38 +109,51 @@ def main() -> None:
             evaluator(model)
         return
 
-    logging.info(f"Loading base model: {MODEL_NAME}")
-    model = SentenceTransformer(
-        MODEL_NAME,
-        model_card_data=SentenceTransformerModelCardData(
-            language="en",
-            license="apache-2.0",
-            model_name=f"{MODEL_NAME.split('/')[-1]} finetuned on AllNLI",
-        ),
+    model = SentenceTransformer(MODEL_NAME)
+
+    train_size = 50 if SMOKE_TEST else 50_000
+    eval_size = 20 if SMOKE_TEST else 1_000
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: trimmed dataset; will run max_steps=1 and skip Hub push")
+    train_dataset = load_dataset("sentence-transformers/all-nli", "triplet", split="train").select(range(train_size))
+    eval_dataset = load_dataset("sentence-transformers/all-nli", "triplet", split="dev").select(range(eval_size))
+
+    inner_loss = MultipleNegativesRankingLoss(model)
+    loss = MatryoshkaLoss(model, inner_loss, matryoshka_dims=MATRYOSHKA_DIMS)
+
+    stsb = load_dataset("sentence-transformers/stsb", split="validation")
+    per_dim_evaluators = [
+        EmbeddingSimilarityEvaluator(
+            sentences1=stsb["sentence1"],
+            sentences2=stsb["sentence2"],
+            scores=stsb["score"],
+            main_similarity=SimilarityFunction.COSINE,
+            name=f"sts-dev-{dim}",
+            truncate_dim=dim,
+        )
+        for dim in MATRYOSHKA_DIMS
+    ]
+    evaluator = SequentialEvaluator(
+        [*per_dim_evaluators, NanoBEIREvaluator()],
+        main_score_function=lambda scores: scores[0],
     )
-
-    logging.info(f"Loading dataset: {DATASET_NAME} ({DATASET_SUBSET})")
-    train_dataset = load_dataset(DATASET_NAME, DATASET_SUBSET, split="train").select(range(TRAIN_SIZE))
-    eval_dataset = load_dataset(DATASET_NAME, DATASET_SUBSET, split="dev").select(range(EVAL_SIZE))
-    logging.info(f"  train: {len(train_dataset):,} examples")
-    logging.info(f"  eval:  {len(eval_dataset):,} examples")
-
-    loss = MultipleNegativesRankingLoss(model)
-
-    evaluator = NanoBEIREvaluator()
     logging.info("Baseline evaluation (before training):")
     with autocast_ctx():
-        baseline_eval = evaluator(model)[evaluator.primary_metric]
+        # Must run before deriving metric_key: each sub-evaluator mutates its primary_metric to add the name_ prefix.
+        baseline_result = evaluator(model)
+    # Drive on the first per-dim evaluator's metric (matches main_score_function above).
+    metric_key = f"eval_{per_dim_evaluators[0].primary_metric}"
+    baseline_eval = baseline_result[per_dim_evaluators[0].primary_metric]
 
     args = SentenceTransformerTrainingArguments(
         output_dir=OUTPUT_DIR,
         num_train_epochs=1,
-        per_device_train_batch_size=64,
-        per_device_eval_batch_size=64,
+        max_steps=1 if SMOKE_TEST else -1,
+        per_device_train_batch_size=128,
+        per_device_eval_batch_size=128,
         learning_rate=2e-5,
         weight_decay=0.01,
         warmup_steps=0.1,
-        lr_scheduler_type="linear",
         bf16=True,
         batch_sampler=BatchSamplers.NO_DUPLICATES,
         eval_strategy="steps",
@@ -172,9 +164,9 @@ def main() -> None:
         logging_steps=0.01,
         logging_first_step=True,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_NanoBEIR_mean_cosine_ndcg@10",
+        metric_for_best_model=metric_key,
         greater_is_better=True,
-        report_to="trackio",  # Optional
+        report_to="none" if SMOKE_TEST else "trackio",
         run_name=RUN_NAME,
         seed=12,
     )
@@ -187,23 +179,29 @@ def main() -> None:
         loss=loss,
         evaluator=evaluator,
     )
-    log_trackio_dashboard()
+    if not SMOKE_TEST:
+        log_trackio_dashboard()
     trainer.train()
 
     logging.info("Post-training evaluation:")
     with autocast_ctx():
-        score = evaluator(model)[evaluator.primary_metric]
+        score = evaluator(model)[per_dim_evaluators[0].primary_metric]
     delta = score - baseline_eval
     verdict = "WIN" if delta >= 0.005 else "MARGINAL" if delta >= 0 else "REGRESSION"
     logging.info(f"VERDICT: {verdict} | score={score:.4f} | baseline={baseline_eval:.4f} | delta={delta:+.4f}")
 
     final_dir = f"{OUTPUT_DIR}/final"
     model.save_pretrained(final_dir)
-    logging.info(f"Saved final model to {final_dir}")
+    logging.info(f"Saved to {final_dir}")
+    logging.info(f"To use at a specific dimension, load with: SentenceTransformer({final_dir!r}, truncate_dim=128)")
+
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: skipping Hub push")
+        return
 
     try:
-        model.push_to_hub(RUN_NAME)  # public by default; uses your authenticated user
-        logging.info(f"Pushed model to https://huggingface.co/{RUN_NAME}")
+        commit_url = model.push_to_hub(RUN_NAME)
+        logging.info(f"Pushed model to {commit_url.rsplit('/commit/', 1)[0]}")
     except Exception:
         import traceback
 

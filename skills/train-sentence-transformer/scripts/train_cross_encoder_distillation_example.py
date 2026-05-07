@@ -16,12 +16,13 @@ distillation: the student learns the teacher's score gaps without ever calling
 the teacher at training time (precomputed score diffs).
 
 For Embedding-MSE / Listwise-KL variants and the broader pattern map, see the
-bi-encoder skill's `train_distillation_example.py` docstring.
+sibling `train_sentence_transformer_distillation_example.py` docstring.
 
 CRITICAL: `activation_fn=nn.Identity()` is mandatory. The default `Sigmoid` (with
 `num_labels=1`) saturates raw logits >5 to ~1.0 inside `predict()` at eval time,
 silently collapsing eval ranking (training loss stays healthy while nDCG drops
-from e.g. ~0.59 to ~0.14). See SKILL.md Directive 6.
+from e.g. ~0.59 to ~0.14). See `../references/troubleshooting.md` ("CrossEncoder
+eval nDCG crashes after distillation / listwise / pairwise training").
 
 Data: this script uses `sentence-transformers/msmarco` (`bert-ensemble-margin-mse`
 subset), which has precomputed teacher score diffs per (q, pos, neg) row. To
@@ -31,10 +32,10 @@ teacher pass over your (q, pos, neg) triples and store `score_diff = teacher_pos
 
 Run locally:
     pip install "sentence-transformers[train]>=5.0"
-    python train_distillation_example.py
+    python train_cross_encoder_distillation_example.py
 
 Multi-GPU:
-    accelerate launch train_distillation_example.py
+    accelerate launch train_cross_encoder_distillation_example.py
 
 Hugging Face Jobs: paste this file's contents as the `script` in hf_jobs(...).
 """
@@ -91,6 +92,7 @@ EVAL_SIZE = 5_000
 OUTPUT_DIR = "models/minilm-msmarco-distilled"
 RUN_NAME = "minilm-msmarco-distilled"
 DATA_CACHE = f"data/{RUN_NAME}-resolved"
+SMOKE_TEST = os.environ.get("SMOKE_TEST") == "1"
 
 
 def setup_logging():
@@ -166,7 +168,11 @@ def main() -> None:
     )
 
     resolved = load_resolved_dataset()
-    split = resolved.train_test_split(test_size=EVAL_SIZE, seed=12)
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: trimmed dataset; will run max_steps=1 and skip Hub push")
+        resolved = resolved.select(range(min(70, len(resolved))))
+    eval_size = 20 if SMOKE_TEST else EVAL_SIZE
+    split = resolved.train_test_split(test_size=eval_size, seed=12)
     train_dataset = split["train"]
     eval_dataset = split["test"]
     logging.info(f"  train: {len(train_dataset):,} rows | eval: {len(eval_dataset):,} rows")
@@ -177,11 +183,14 @@ def main() -> None:
     evaluator = CrossEncoderNanoBEIREvaluator(dataset_names=["msmarco", "nfcorpus", "nq"])
     logging.info("Baseline evaluation:")
     with autocast_ctx():
+        # Must run before deriving metric_key: evaluator(model) mutates primary_metric to add the name_ prefix.
         baseline_eval = evaluator(model)[evaluator.primary_metric]
+    metric_key = f"eval_{evaluator.primary_metric}"
 
     args = CrossEncoderTrainingArguments(
         output_dir=OUTPUT_DIR,
         num_train_epochs=1,
+        max_steps=1 if SMOKE_TEST else -1,
         per_device_train_batch_size=32,
         per_device_eval_batch_size=32,
         learning_rate=8e-6,  # Lower than typical 2e-5; distillation regression converges faster
@@ -197,9 +206,9 @@ def main() -> None:
         logging_steps=0.01,
         logging_first_step=True,
         load_best_model_at_end=True,
-        metric_for_best_model="eval_NanoBEIR_R100_mean_ndcg@10",
+        metric_for_best_model=metric_key,
         greater_is_better=True,
-        report_to="trackio",
+        report_to="none" if SMOKE_TEST else "trackio",
         run_name=RUN_NAME,
         seed=12,
     )
@@ -213,7 +222,8 @@ def main() -> None:
         evaluator=evaluator,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],  # CE rerankers peak mid-training
     )
-    log_trackio_dashboard()
+    if not SMOKE_TEST:
+        log_trackio_dashboard()
     trainer.train()
 
     logging.info("Post-training evaluation:")
@@ -227,9 +237,13 @@ def main() -> None:
     model.save_pretrained(final_dir)
     logging.info(f"Saved final model to {final_dir}")
 
+    if SMOKE_TEST:
+        logging.info("SMOKE_TEST=1: skipping Hub push")
+        return
+
     try:
-        model.push_to_hub(RUN_NAME)
-        logging.info(f"Pushed model to https://huggingface.co/{RUN_NAME}")
+        commit_url = model.push_to_hub(RUN_NAME)
+        logging.info(f"Pushed model to {commit_url.rsplit('/commit/', 1)[0]}")
     except Exception:
         import traceback
 
