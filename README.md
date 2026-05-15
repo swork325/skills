@@ -1,151 +1,94 @@
-# Hugging Face Skills
+# Skills
 
-Hugging Face Skills are definitions for AI/ML tasks like dataset creation, model training, and evaluation. They are interoperable with all major coding agent tools like OpenAI Codex, Anthropic's Claude Code, Google DeepMind's Gemini CLI, and Cursor.
+A fork of [huggingface/skills](https://huggingface.co/skills) — a platform for discovering, evaluating, and sharing AI skills/tools that can be used by language model agents.
 
-The skills in this repository follow the standardized [Agent Skills](https://agentskills.io/home) format.
+## Overview
 
-> [!NOTE]
-> **Just want to give your agent access to the Hugging Face Hub?** Start with [`hf-cli`](https://huggingface.co/docs/hub/agents-cli). It's the recommended first Skill to install: it teaches your agent every `hf` command (search models, manage datasets and buckets, launch Spaces, run jobs) and is generated from your locally installed CLI so it stays current.
+This repository contains:
+- **Skills marketplace** — A curated collection of AI skills/tools
+- **Agent generation** — Automated workflows for generating agents from skills
+- **Evaluation leaderboards** — Track and compare skill performance across models
+- **Hacker leaderboards** — Community contributions and rankings
 
-## How do Skills work?
-
-In practice, skills are self-contained folders that package instructions, scripts, and resources together for an AI agent to use on a specific use case. Each folder includes a `SKILL.md` file with YAML frontmatter (name and description) followed by the guidance your coding agent follows while the skill is active. 
-
-> [!TIP]
-> If your agent doesn't support skills, you can use [`agents/AGENTS.md`](agents/AGENTS.md) directly as a fallback.
-
-The skills in this repository are also available through:
- - Cursor Marketplace (https://cursor.com/marketplace/huggingface)
- - Codex Plugins Directory (https://developers.openai.com/codex/plugins)
-
-## Installation
-
-Hugging Face skills are compatible with Claude Code, Codex, Gemini CLI, and Cursor.
-
-### Claude Code
-
-1. Register the repository as a plugin marketplace:  
-   
-```
-/plugin marketplace add huggingface/skills
-```
-
-2. To install a skill, run:  
-   
-```
-/plugin install <skill-name>@huggingface/skills
-```
-
-For example:  
+## Structure
 
 ```
-/plugin install hf-cli@huggingface/skills
+├── .claude-plugin/          # Claude AI plugin configuration
+│   ├── plugin.json          # Plugin metadata and settings
+│   └── marketplace.json     # Available skills for Claude
+├── .cursor-plugin/          # Cursor IDE plugin configuration
+│   ├── plugin.json          # Plugin metadata and settings
+│   └── marketplace.json     # Available skills for Cursor
+├── .github/
+│   └── workflows/
+│       ├── generate-agents.yml          # Auto-generate agents from skills
+│       ├── push-evals-leaderboard.yml   # Update evals leaderboard
+│       └── push-hackers-leaderboard.yml # Update hackers leaderboard
 ```
 
-### Codex
+## Getting Started
 
-1. Copy or symlink any skills you want to use from this repository's `skills/` directory into one of Codex's standard `.agents/skills` locations (for example, `$REPO_ROOT/.agents/skills` or `$HOME/.agents/skills`) as described in the [Codex Skills guide](https://developers.openai.com/codex/skills/).
+### Prerequisites
 
-2. Once a skill is available in one of those locations, Codex will discover it using the Agent Skills standard and load the `SKILL.md` instructions when it decides to use that skill or when you explicitly invoke it.
+- Python 3.9+
+- `pip` or `uv` for package management
 
-3. If your Codex setup still relies on `AGENTS.md`, you can use the generated [`agents/AGENTS.md`](agents/AGENTS.md) file in this repo as a fallback bundle of instructions.
+### Installation
 
-### Gemini CLI
-
-1. This repo includes `gemini-extension.json` to integrate with the Gemini CLI.
-
-2. Install locally:  
-
-```
-gemini extensions install . --consent
+```bash
+git clone https://github.com/your-org/skills.git
+cd skills
+pip install -r requirements.txt
 ```
 
-or use the GitHub URL:
+### Usage
 
-```
-gemini extensions install https://github.com/huggingface/skills.git --consent
+#### Browse the Marketplace
+
+Skills are defined in the marketplace JSON files and can be loaded programmatically:
+
+```python
+import json
+
+with open('.claude-plugin/marketplace.json') as f:
+    marketplace = json.load(f)
+
+for skill in marketplace['skills']:
+    print(f"{skill['name']}: {skill['description']}")
 ```
 
-4. See [Gemini CLI extensions docs](https://geminicli.com/docs/extensions/#installing-an-extension) for more help.
+#### Running Evaluations
+
+Evaluations are triggered automatically via GitHub Actions on push to `main`, or can be run manually:
+
+```bash
+# Trigger evaluation workflow
+gh workflow run push-evals-leaderboard.yml
+```
+
+## Plugin Integration
+
+### Claude
+
+The `.claude-plugin/` directory contains configuration for integrating skills with Claude AI. The `plugin.json` defines the plugin manifest and `marketplace.json` lists all available skills.
 
 ### Cursor
 
-This repository includes Cursor plugin manifests:
+The `.cursor-plugin/` directory provides similar integration for the Cursor IDE, enabling AI-assisted coding with custom skills.
 
-- `.cursor-plugin/plugin.json`
-- `.mcp.json` (configured with the Hugging Face MCP server URL)
+## Contributing
 
-Install from repository URL (or local checkout) via the Cursor plugin flow.
+1. Fork this repository
+2. Create a feature branch: `git checkout -b feat/my-new-skill`
+3. Add your skill definition to the appropriate marketplace JSON
+4. Submit a pull request
 
-For contributors, regenerate manifests with:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-```bash
-./scripts/publish.sh
-```
+## Security
 
-## Skills
+Please review our [Security Policy](.github/workflows/SECURITY.md) before reporting vulnerabilities.
 
-This repository contains a few skills to get you started. You can also contribute your own skills to the repository.
+## License
 
-### Available skills
-
-<!-- This table is auto-generated by scripts/generate_agents.py. Do not edit manually. -->
-<!-- BEGIN_SKILLS_TABLE -->
-| Name | Description | Documentation |
-|------|-------------|---------------|
-| `hf-cli` | Execute Hugging Face Hub operations using the hf CLI. Download models/datasets, upload files, manage repos, and run cloud compute jobs. | [SKILL.md](skills/hf-cli/SKILL.md) |
-| `huggingface-best` | Find the best AI model for any task by querying Hugging Face leaderboards and benchmarks. Recommends top models based on task type, hardware constraints, and benchmark scores. | [SKILL.md](skills/huggingface-best/SKILL.md) |
-| `huggingface-community-evals` | Add and manage evaluation results in Hugging Face model cards. Supports extracting eval tables from README content, importing scores from Artificial Analysis API, and running custom evaluations with vLLM/lighteval. | [SKILL.md](skills/huggingface-community-evals/SKILL.md) |
-| `huggingface-datasets` | Explore, query, and extract data from any Hugging Face dataset using the Dataset Viewer REST API and npx tooling. Zero Python dependencies — covers split/config discovery, row pagination, text search, filtering, SQL via parquetlens, and dataset upload via CLI. | [SKILL.md](skills/huggingface-datasets/SKILL.md) |
-| `huggingface-gradio` | Build Gradio web UIs and demos in Python. Use when creating or editing Gradio apps, components, event listeners, layouts, or chatbots. | [SKILL.md](skills/huggingface-gradio/SKILL.md) |
-| `huggingface-llm-trainer` | Train or fine-tune language models using TRL on Hugging Face Jobs infrastructure. Covers SFT, DPO, GRPO and reward modeling training methods, plus GGUF conversion for local deployment. Includes hardware selection, cost estimation, Trackio monitoring, and Hub persistence. | [SKILL.md](skills/huggingface-llm-trainer/SKILL.md) |
-| `huggingface-local-models` | Use to select models to run locally with llama.cpp and GGUF on CPU, Mac Metal, CUDA, or ROCm. Covers finding GGUFs, quant selection, running servers, exact GGUF file lookup, conversion, and OpenAI-compatible local serving. | [SKILL.md](skills/huggingface-local-models/SKILL.md) |
-| `huggingface-paper-publisher` | Publish and manage research papers on Hugging Face Hub. Supports creating paper pages, linking papers to models/datasets, claiming authorship, and generating professional markdown-based research articles. | [SKILL.md](skills/huggingface-paper-publisher/SKILL.md) |
-| `huggingface-papers` | Look up and read Hugging Face paper pages in markdown, and use the papers API for structured metadata like authors, linked models, datasets, Spaces, and media URLs when needed. | [SKILL.md](skills/huggingface-papers/SKILL.md) |
-| `huggingface-tool-builder` | Build reusable scripts for Hugging Face Hub and API workflows. Useful for chaining API calls, enriching Hub metadata, or automating repeated tasks. | [SKILL.md](skills/huggingface-tool-builder/SKILL.md) |
-| `huggingface-trackio` | Track and visualize ML training experiments with Trackio. Log metrics via Python API and retrieve them via CLI. Supports real-time dashboards synced to HF Spaces. | [SKILL.md](skills/huggingface-trackio/SKILL.md) |
-| `huggingface-vision-trainer` | Train and fine-tune object detection models (RTDETRv2, YOLOS, DETR and others) and image classification models (timm and transformers models — MobileNetV3, MobileViT, ResNet, ViT/DINOv3) using Transformers Trainer API on Hugging Face Jobs infrastructure or locally. Includes COCO dataset format support, Albumentations augmentation, mAP/mAR metrics, trackio tracking, hardware selection, and Hub persistence. | [SKILL.md](skills/huggingface-vision-trainer/SKILL.md) |
-| `train-sentence-transformers` | Train or fine-tune sentence-transformers models across all three architectures: SentenceTransformer (bi-encoder embeddings), CrossEncoder (rerankers), and SparseEncoder (SPLADE). Covers loss selection, hard-negative mining, evaluators, distillation, LoRA, Matryoshka, and Hugging Face Hub publishing. | [SKILL.md](skills/train-sentence-transformers/SKILL.md) |
-| `transformers-js` | Run state-of-the-art machine learning models directly in JavaScript/TypeScript for NLP, computer vision, audio processing, and multimodal tasks. Works in Node.js and browsers with WebGPU/WASM using Hugging Face models. | [SKILL.md](skills/transformers-js/SKILL.md) |
-<!-- END_SKILLS_TABLE -->
-
-### Using skills in your coding agent
-
-Once a skill is installed, mention it directly while giving your coding agent instructions:
-
-- "Use the HF LLM trainer skill to estimate the GPU memory needed for a 70B model run."
-- "Use the HF model evaluation skill to launch `run_eval_job.py` on the latest checkpoint."
-- "Use the HF dataset creator skill to draft new few-shot classification templates."
-- "Use the HF paper publisher skill to index my arXiv paper and link it to my model."
-
-Your coding agent automatically loads the corresponding `SKILL.md` instructions and helper scripts while it completes the task.
-
-### Contribute or customize a skill
-
-1. Copy one of the existing skill folders (for example, `hf-datasets/`) and rename it.
-2. Update the new folder's `SKILL.md` frontmatter:
-   ```markdown
-   ---
-   name: my-skill-name
-   description: Describe what the skill does and when to use it
-   ---
-
-   # Skill Title
-   Guidance + examples + guardrails
-   ```
-3. Add or edit supporting scripts, templates, and documents referenced by your instructions.
-4. Add an entry to `.claude-plugin/marketplace.json` with a concise, human-readable description.
-5. Run:
-   ```bash
-   ./scripts/publish.sh
-   ```
-   to regenerate and validate all generated metadata.
-6. Reinstall or reload the skill bundle in your coding agent so the updated folder is available.
-
-### Marketplace
-
-The `.claude-plugin/marketplace.json` file lists skills with human-readable descriptions for the plugin marketplace. The CI validates that skill names and paths match between `SKILL.md` files and `marketplace.json`, but descriptions are maintained separately: `SKILL.md` descriptions guide when Claude activates the skill, while marketplace descriptions are written for humans browsing available skills.
-
-### Additional references
-- Browse the latest instructions, scripts, and templates directly at [huggingface/skills](https://github.com/huggingface/skills).
-- Review Hugging Face documentation for the specific libraries or workflows you reference inside each skill.
+This project is licensed under the Apache 2.0 License — see [LICENSE](LICENSE) for details.
