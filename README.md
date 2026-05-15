@@ -92,3 +92,7 @@ Please review our [Security Policy](.github/SECURITY.md) before reporting vulner
 ## License
 
 This project is licensed under the Apache 2.0 License — see [LICENSE](LICENSE) for details.
+
+---
+
+> **Personal note:** I'm using this fork primarily to experiment with adding custom skills for local LLM workflows (Ollama + LiteLLM). The upstream repo focuses on hosted models, but most of the tooling works fine locally with minor config changes.
