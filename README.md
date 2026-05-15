@@ -66,6 +66,18 @@ Evaluations are triggered automatically via GitHub Actions on push to `main`, or
 gh workflow run push-evals-leaderboard.yml
 ```
 
+## Local LLM Setup (Ollama + LiteLLM)
+
+This fork is primarily used with local models. To point the tooling at a local Ollama instance instead of hosted APIs, set the following environment variables before running any scripts:
+
+```bash
+export OPENAI_API_BASE="http://localhost:11434/v1"
+export OPENAI_API_KEY="ollama"  # Ollama doesn't require a real key
+export DEFAULT_MODEL="ollama/llama3"  # or whichever model you have pulled
+```
+
+Most skills work out of the box with this config. A few that rely on function-calling may need a model with tool-use support (e.g. `llama3.1`, `mistral-nemo`).
+
 ## Plugin Integration
 
 ### Claude
@@ -95,4 +107,4 @@ This project is licensed under the Apache 2.0 License — see [LICENSE](LICENSE)
 
 ---
 
-> **Personal note:** I'm using this fork primarily to experiment with adding custom skills for local LLM workflows (Ollama + LiteLLM). The upstream repo focuses on hosted models, but most of the tooling works fine locally with minor config changes.
+> **Personal note:** I'm using this fork primarily to experiment with adding custom skills for local LLM workflows (Ollama + LiteLLM). The upstream repo focuses on hosted models, but most of the tooling works fine locally with minor config changes
