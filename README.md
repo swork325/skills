@@ -73,7 +73,7 @@ This fork is primarily used with local models. To point the tooling at a local O
 ```bash
 export OPENAI_API_BASE="http://localhost:11434/v1"
 export OPENAI_API_KEY="ollama"  # Ollama doesn't require a real key
-export DEFAULT_MODEL="ollama/llama3"  # or whichever model you have pulled
+export DEFAULT_MODEL="ollama/llama3.1"  # llama3.1 recommended — better tool-use support than plain llama3
 ```
 
 Most skills work out of the box with this config. A few that rely on function-calling may need a model with tool-use support (e.g. `llama3.1`, `mistral-nemo`).
@@ -92,19 +92,4 @@ The `.cursor-plugin/` directory provides similar integration for the Cursor IDE,
 
 1. Fork this repository
 2. Create a feature branch: `git checkout -b feat/my-new-skill`
-3. Add your skill definition to the appropriate marketplace JSON
-4. Submit a pull request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-## Security
-
-Please review our [Security Policy](.github/SECURITY.md) before reporting vulnerabilities.
-
-## License
-
-This project is licensed under the Apache 2.0 License — see [LICENSE](LICENSE) for details.
-
----
-
-> **Personal note:** I'm using this fork primarily to experiment with adding custom skills for local LLM workflows (Ollama + LiteLLM). The upstream repo focuses on hosted models, but most of the tooling works fine locally with minor config changes
+3. Add your skill defin
