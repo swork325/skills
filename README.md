@@ -78,6 +78,8 @@ export DEFAULT_MODEL="ollama/mistral-nemo"  # mistral-nemo works better for me t
 
 Most skills work out of the box with this config. A few that rely on function-calling may need a model with tool-use support (e.g. `llama3.1`, `mistral-nemo`).
 
+> **Note:** I've also had good results with `qwen2.5:14b` for tool-use heavy workflows — noticeably more reliable than mistral-nemo on multi-step tasks, though a bit slower on my machine (M2 Pro, 32GB).
+
 ## Plugin Integration
 
 ### Claude
@@ -91,4 +93,4 @@ The `.cursor-plugin/` directory provides similar integration for the Cursor IDE,
 ## Contributing
 
 1. Fork this repository
-2. Create a feature branch: `git checkout -b feat/my-ne
+2. Create a feature branch: `
