@@ -12,10 +12,12 @@ Personal fork notes:
 - Updated __author__ to reflect personal fork ownership
 - Added __version_info__ tuple for easier programmatic version comparisons
 - Added __fork_of__ to track upstream origin for reference
+- Added __fork_version__ to track my own changes independently of upstream __version__
 """
 
 __version__ = "0.1.0"
 __version_info__ = tuple(int(x) for x in __version__.split("."))  # e.g. (0, 1, 0)
+__fork_version__ = "0.1.0-personal.3"  # my own versioning on top of upstream; bump when I make notable changes
 __author__ = "personal fork"  # changed from "Skills Contributors" to reflect this is my fork
 __license__ = "Apache-2.0"
 __description__ = "A collection of AI-powered tools and utilities for agent workflows."
@@ -30,6 +32,7 @@ __all__ = [
     "SkillResult",
     "__version__",
     "__version_info__",
+    "__fork_version__",
     "__author__",
     "__license__",
     "__description__",
