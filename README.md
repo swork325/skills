@@ -73,7 +73,7 @@ This fork is primarily used with local models. To point the tooling at a local O
 ```bash
 export OPENAI_API_BASE="http://localhost:11434/v1"
 export OPENAI_API_KEY="ollama"  # Ollama doesn't require a real key
-export DEFAULT_MODEL="ollama/llama3.1"  # llama3.1 recommended — better tool-use support than plain llama3
+export DEFAULT_MODEL="ollama/mistral-nemo"  # mistral-nemo works better for me than llama3.1 — snappier responses and solid tool-use
 ```
 
 Most skills work out of the box with this config. A few that rely on function-calling may need a model with tool-use support (e.g. `llama3.1`, `mistral-nemo`).
@@ -91,5 +91,4 @@ The `.cursor-plugin/` directory provides similar integration for the Cursor IDE,
 ## Contributing
 
 1. Fork this repository
-2. Create a feature branch: `git checkout -b feat/my-new-skill`
-3. Add your skill defin
+2. Create a feature branch: `git checkout -b feat/my-ne
