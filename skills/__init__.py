@@ -3,6 +3,10 @@
 This package provides a set of skills that can be used by AI agents
 to perform various tasks, including code generation, data analysis,
 and more.
+
+Personal fork notes:
+- Using this for experimenting with custom skill implementations
+- See skills/custom/ for personal additions
 """
 
 __version__ = "0.1.0"
