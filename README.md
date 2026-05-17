@@ -73,7 +73,7 @@ This fork is primarily used with local models. To point the tooling at a local O
 ```bash
 export OPENAI_API_BASE="http://localhost:11434/v1"
 export OPENAI_API_KEY="ollama"  # Ollama doesn't require a real key
-export DEFAULT_MODEL="ollama/mistral-nemo"  # mistral-nemo works better for me than llama3.1 — snappier responses and solid tool-use
+export DEFAULT_MODEL="ollama/qwen2.5:14b"  # switched from mistral-nemo — qwen2.5:14b is more reliable on multi-step tool-use
 ```
 
 Most skills work out of the box with this config. A few that rely on function-calling may need a model with tool-use support (e.g. `llama3.1`, `mistral-nemo`).
@@ -86,11 +86,4 @@ Most skills work out of the box with this config. A few that rely on function-ca
 
 The `.claude-plugin/` directory contains configuration for integrating skills with Claude AI. The `plugin.json` defines the plugin manifest and `marketplace.json` lists all available skills.
 
-### Cursor
-
-The `.cursor-plugin/` directory provides similar integration for the Cursor IDE, enabling AI-assisted coding with custom skills.
-
-## Contributing
-
-1. Fork this repository
-2. Create a feature branch: `
+### Curs
