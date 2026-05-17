@@ -13,15 +13,17 @@ Personal fork notes:
 - Added __version_info__ tuple for easier programmatic version comparisons
 - Added __fork_of__ to track upstream origin for reference
 - Added __fork_version__ to track my own changes independently of upstream __version__
+- Added __contact__ with my GitHub handle for quick reference
 """
 
 __version__ = "0.1.0"
 __version_info__ = tuple(int(x) for x in __version__.split("."))  # e.g. (0, 1, 0)
-__fork_version__ = "0.1.0-personal.3"  # my own versioning on top of upstream; bump when I make notable changes
+__fork_version__ = "0.1.0-personal.4"  # my own versioning on top of upstream; bump when I make notable changes
 __author__ = "personal fork"  # changed from "Skills Contributors" to reflect this is my fork
 __license__ = "Apache-2.0"
 __description__ = "A collection of AI-powered tools and utilities for agent workflows."
 __fork_of__ = "huggingface/skills"  # upstream repo, useful for tracking drift
+__contact__ = "https://github.com/personal"  # my GitHub profile for quick reference
 
 from skills.registry import SkillRegistry
 from skills.base import BaseSkill, SkillResult
@@ -37,4 +39,5 @@ __all__ = [
     "__license__",
     "__description__",
     "__fork_of__",
+    "__contact__",
 ]
